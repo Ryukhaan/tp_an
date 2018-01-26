@@ -12,7 +12,7 @@ num_iterations = 1000
 neighborhood = 8 / 2.0
 time_constant = num_iterations / np.log(neighborhood)
 # Every dt iterations, update plotting
-dt = 25
+dt = 100
 
 #==============================================================================
 # ** Self Organized Map
@@ -38,6 +38,9 @@ class SOM(object):
 		self.som_size = width, height
 		self.cell_size = len(dataset[0])
 		self.cells = np.random.random((width, height, self.cell_size))
+
+	def clear(self):
+		self.cells = np.random.random((self.som_size[0], self.som_size[1], self.cell_size))
 
 	def decay_radius(self, i, time = time_constant):
 		"""
@@ -207,6 +210,18 @@ def kNearestNeighbor(X_train, y_train, X_test, predictions, k):
 	for i in range(len(X_test)):
 		predictions.append(predict(X_train, y_train, X_test[i, :], k))
 
+def confusion_matrix(y_real, y_predicted):
+	matrix = np.zeros([len(set(y_real)), len(set(y_real))])
+	for i in range(len(set(y_real))):
+		for j in range(len(set(y_real))):
+			matrix[i, j] = len(
+				filter(
+					lambda x : x[0] == i+1 and x[1] == j+1, 
+					zip(y_real, y_predicted)
+					)
+				)
+	return matrix
+
 if __name__ == "__main__":
 	# Creating Dataset
 	X = list()
@@ -222,24 +237,55 @@ if __name__ == "__main__":
 	X = np.asarray(X)
 	# Creating Self-Organasing Map
 	net = SOM(width = 8, height = 8, dataset = X)
+
 	net.assignNeighbor(5)
 
 	fig = plt.figure()
 	plt.ion()
 	ax = fig.add_subplot(111)
 
-	# Start Learning
-	for i in range(num_iterations+1):
-		net.train_one_time(i+1)
-		if (i % dt == 0) or (i == 80):
-			ax.clear()
-			ax = net.draw(ax)
-			net.assignNeighbor(5)
-			plt.plot()
-			plt.draw()
-			plt.pause(0.01)
-			#fig.canvas.draw()
-			#fig.savefig("kohonen_{}".format(i))
+	accuracy = 0
+	np.random.shuffle(X)
+
+	# Cross-Validation
+	for i in range(5):
+		# Split datas
+		x_test = X[i*30:(i+1)*30]
+		indexes = range(i*30, (i+1)*30) 
+		x_train = np.delete(X, indexes, 0)
+
+		# Clear previous learning
+		net.data = x_train
+		net.clear()
+
+		# Start Learning
+		for i in range(num_iterations):
+			net.train_one_time(i)
+			if (i % dt == 0) or (i == 80):
+				ax.clear()
+				ax = net.draw(ax)
+				net.assignNeighbor(5)
+				plt.plot()
+				plt.draw()
+				plt.pause(0.01)
+				#fig.canvas.draw()
+				#fig.savefig("kohonen_{}".format(i))
+
+		# KNN assignement
+		#net.assignNeighbor(5)
+
+		# Accuracy calculus
+		y_test = x_test[:, -1]
+		y_predicted = []
+		for x in x_test:
+			_, bmu_idx = net.find_bmu(x)
+			y_predicted.append(net.cells[bmu_idx[0], bmu_idx[1], -1])
+		matrix = confusion_matrix(y_test, y_predicted)
+		print matrix
+		accuracy += sum([matrix[i, i] for i in range(len(matrix))]) / matrix.sum()
+
+	print accuracy / 5
+
 	
 
 
