@@ -2,15 +2,17 @@ import numpy as np
 import csv 
 import matplotlib.pyplot as plt
 import time
+from collections import Counter
 
 #==============================================================================
 # Useful Constants
 #==============================================================================
 num_iterations = 1000
-neighborhood = max(som_size[0], som_size[1]) / 2.0
+
+neighborhood = 8 / 2.0
 time_constant = num_iterations / np.log(neighborhood)
 # Every dt iterations, update plotting
-dt = 10
+dt = 25
 
 #==============================================================================
 # ** Self Organized Map
@@ -32,9 +34,9 @@ class SOM(object):
 
 		self.data = dataset
 		self.radius = max(width, height) / 2.0
-		self.learning_rate = 0.12
+		self.learning_rate = 0.13
 		self.som_size = width, height
-		self.cell_size = len(dataset[0]) - 1
+		self.cell_size = len(dataset[0])
 		self.cells = np.random.random((width, height, self.cell_size))
 
 	def decay_radius(self, i, time = time_constant):
@@ -84,14 +86,14 @@ class SOM(object):
 		# Calculate the distance between each prototype and the input
 		for x in range(self.som_size[0]):
 		    for y in range(self.som_size[1]):
-		        w = self.cells[x, y, :].reshape(self.cell_size, 1)
+		        w = self.cells[x, y, :-1].reshape(self.cell_size-1, 1)
 		        # Don't bother with actual Euclidean distance, to avoid expensive sqrt operation
 		        sq_dist = np.sum((w - t) ** 2)
 		        if sq_dist < min_dist:
 		            min_dist = sq_dist
 		            bmu_idx = np.array([x, y])
 		# Get prototype corresponding to bmu_idx
-		bmu = self.cells[bmu_idx[0], bmu_idx[1], :].reshape(self.cell_size, 1)
+		bmu = self.cells[bmu_idx[0], bmu_idx[1], :-1].reshape(self.cell_size-1, 1)
 		# Return the (bmu, bmu_idx) tuple
 		return (bmu, bmu_idx)
 
@@ -115,7 +117,7 @@ class SOM(object):
 		# Update prototypes
 		for x in range(self.som_size[0]):
 			for y in range(self.som_size[1]):
-				w = self.cells[x, y, :].reshape(self.cell_size, 1)
+				w = self.cells[x, y, :-1].reshape(self.cell_size-1, 1)
 				# Get the 2-D distance (again the Euclidean distance without sqrt)
 				w_dist = np.sum((np.array([x, y]) - bmu_idx) ** 2)
 				# If the distance is within the current neighbourhood radius
@@ -125,7 +127,7 @@ class SOM(object):
 					# Now update the prototypes
 					new_w = w + (alpha * influence * (example - w))
 					# Commit the new prototype, don't forget to "switch" dimensions
-					self.cells[x, y, :] = new_w.reshape(1, self.cell_size)		
+					self.cells[x, y, :-1] = new_w.reshape(1, self.cell_size-1)		
 
 	def train(self, n):
 		"""
@@ -136,6 +138,44 @@ class SOM(object):
 		"""
 		for i in range(n):
 			self.train_one_time(i)
+
+
+	def draw(self, ax, **kwargs):
+		# Displaying Dataset
+		x1, y1 = [], []
+		x2, y2 = [], []
+		x3, y3 = [], []
+		p = 2 # petal length
+		q = 3 # petal width 
+		ax.clear()
+		for i in range(8):
+			for j in range(8):
+				if net.cells[i, j, -1] == 1:
+					x1.append(net.cells[i, j, p])
+					y1.append(net.cells[i, j, q])
+				elif net.cells[i, j, -1] == 2:
+					x2.append(net.cells[i, j, p])
+					y2.append(net.cells[i, j, q])
+				elif net.cells[i, j, -1] == 3:
+					x3.append(net.cells[i, j, p])
+					y3.append(net.cells[i, j, q])
+		type1 = ax.scatter(x1, y1, s=50, c='red')
+		type2 = ax.scatter(x2, y2, s=50, c='green')
+		type3 = ax.scatter(x3, y3, s=50, c='blue')
+		ax.set_title('Taille du petal : jeu de donnees Iris', fontsize=14)
+		ax.set_xlabel('Longueur petal  normalisee (cm)')
+		ax.set_ylabel('Largeur petal normalisee (cm)')
+		ax.legend([type1, type2, type3], ["P-Iris Setosa", "P-Iris Versicolor", "P-Iris Virginica"], loc=2)
+		return ax
+
+	def assignNeighbor(self, k):
+		n, m = self.som_size
+		self.cells = self.cells.reshape([n*m, 5])
+		predictions = []
+		kNearestNeighbor(self.data[:, 0:4], self.data[:, 4], self.cells[:, :-1], predictions, k)
+		for i in range(len(self.cells)):
+			self.cells[i, 4] = predictions[i]
+		self.cells = self.cells.reshape([n, m, 5])		
 
 def predict(X_train, y_train, x_test, k):
 
@@ -163,10 +203,7 @@ def predict(X_train, y_train, x_test, k):
 
 
 def kNearestNeighbor(X_train, y_train, X_test, predictions, k):
-	# train, is it really mandatory ?
-	train(X_train, y_train)
-
-	# loop over all observations
+	# Loop over all observations
 	for i in range(len(X_test)):
 		predictions.append(predict(X_train, y_train, X_test[i, :], k))
 
@@ -183,80 +220,30 @@ if __name__ == "__main__":
 			X.append(tmp)
 			#y.append(row[-1])
 	X = np.asarray(X)
-	
 	# Creating Self-Organasing Map
 	net = SOM(width = 8, height = 8, dataset = X)
-
-	# Displaying Dataset
-	x1, y1 = [], []
-	x2, y2 = [], []
-	x3, y3 = [], []
-	p = 2 # petal length
-	q = 3 # petal width 
-	for i, elem in enumerate(net.data):
-		if net.data[i, -1] == 1:
-			x1.append(net.data[i][p])
-			y1.append(net.data[i][q])
-		elif net.data[i, -1] == 2:
-			x2.append(net.data[i][p])
-			y2.append(net.data[i][q])
-		elif net.data[i, -1] == 3:
-			x3.append(net.data[i][p])
-			y3.append(net.data[i][q])
-
-	x_net = net.cells[:, :, p].reshape(np.array([net.som_size[0] * net.som_size[1], 1]))
-	y_net = net.cells[:, :, q].reshape(np.array([net.som_size[0] * net.som_size[1], 1]))
+	net.assignNeighbor(5)
 
 	fig = plt.figure()
 	plt.ion()
-	#plt.hold(False)
 	ax = fig.add_subplot(111)
-	type1 = ax.scatter(x1, y1, s=50, c='red')
-	type2 = ax.scatter(x2, y2, s=50, c='green')
-	type3 = ax.scatter(x3, y3, s=50, c='blue')
-	type4 = ax.scatter(x_net, y_net, s=50, c='black')
-	ax.set_title('Taille du petal : jeu de donnees Iris', fontsize=14)
-	ax.set_xlabel('Longueur petal  normalisee (cm)')
-	ax.set_ylabel('Largeur petal normalisee (cm)')
-	ax.legend([type1, type2, type3, type4], ["Iris Setosa", "Iris Versicolor", "Iris Virginica", "Prototypes"], loc=2)
-	ax.grid(True,linestyle='-',color='0.75')
-	plt.plot()
-	plt.pause(5)
 
-	# Start
-	net.train_one_time(0)
-	x_net = net.cells[:, :, p].reshape(np.array([net.som_size[0] * net.som_size[1], 1]))
-	y_net = net.cells[:, :, q].reshape(np.array([net.som_size[0] * net.som_size[1], 1]))
-	type4 = ax.scatter(x_net, y_net, s=50, c='black')
-	ax.legend([type1, type2, type3, type4], ["Iris Setosa", "Iris Versicolor", "Iris Virginica", "Cells"], loc=2)
-	ax.grid(True,linestyle='-',color='0.75')
-	plt.plot()
-	plt.draw()
-
-	# Learning
-	for i in range(num_iterations):
-		#time.sleep(0.1)
+	# Start Learning
+	for i in range(num_iterations+1):
 		net.train_one_time(i+1)
-		if i % dt == 0:
+		if (i % dt == 0) or (i == 80):
 			ax.clear()
-			x_net = net.cells[:, :, p].reshape(np.array([net.som_size[0] * net.som_size[1], 1]))
-			y_net = net.cells[:, :, q].reshape(np.array([net.som_size[0] * net.som_size[1], 1]))
-			type1 = ax.scatter(x1, y1, s=50, c='red')
-			type2 = ax.scatter(x2, y2, s=50, c='green')
-			type3 = ax.scatter(x3, y3, s=50, c='blue')
-			type4 = ax.scatter(x_net, y_net, s=50, c="black")
-			#ax.legend([type4])
+			ax = net.draw(ax)
+			net.assignNeighbor(5)
 			plt.plot()
 			plt.draw()
 			plt.pause(0.01)
 			#fig.canvas.draw()
+			#fig.savefig("kohonen_{}".format(i))
+	
 
-	x_net = net.cells[:, :, p].reshape(np.array([net.som_size[0] * net.som_size[1], 1]))
-	y_net = net.cells[:, :, q].reshape(np.array([net.som_size[0] * net.som_size[1], 1]))
-	type4 = ax.scatter(x_net, y_net, s=50, c='yellow')
-	#ax.legend([type1, type2, type3, type4, type5], ["Iris Setosa", "Iris Versicolor", "Iris Virginica", "Cells"], loc=2)
-	#ax.grid(True,linestyle='-',color='0.75')
-	plt.plot()
+
+
 
 
 		
