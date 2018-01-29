@@ -8,9 +8,9 @@ import sys
 # Testing
 from sklearn.metrics import accuracy_score
 
-#==============================================================================
+# ==============================================================================
 # Useful Constants
-#==============================================================================
+# ==============================================================================
 num_iterations = 1000
 
 neighborhood = 8 / 2.0
@@ -18,11 +18,12 @@ time_constant = num_iterations / np.log(neighborhood)
 # Every dt iterations, update plotting
 dt = 100
 
-#==============================================================================
+
+# ==============================================================================
 # ** Self Organized Map
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 #  This class performs SOM.
-#==============================================================================
+# ==============================================================================
 class SOM(object):
 	"""This class performs SOM
 	Attributes:
@@ -211,45 +212,45 @@ class SOM(object):
 
 def predict(X_train, y_train, x_test, k):
 
-	# create list for distances and targets
-	distances = []
-	targets = []
+    # create list for distances and targets
+    distances = []
+    targets = []
 
-	# Can it be done with intention list ?
-	for i in range(len(X_train)):
-		# Euclidean distance
-		distance = np.sqrt(np.sum(np.square(x_test - X_train[i, :])))
-		# Add it to list of distances
-		distances.append([distance, i])
+    # Can it be done with intention list ?
+    for i in range(len(X_train)):
+        # Euclidean distance
+        distance = np.sqrt(np.sum(np.square(x_test - X_train[i, :])))
+        # Add it to list of distances
+        distances.append([distance, i])
 
-	# Sort the list of distances
-	distances = sorted(distances)
+    # Sort the list of distances
+    distances = sorted(distances)
 
-	# List of the k neighbors
-	for i in range(k):
-		index = distances[i][1]
-		targets.append(y_train[index])
+    # List of the k neighbors
+    for i in range(k):
+        index = distances[i][1]
+        targets.append(y_train[index])
 
-	# Return most common target
-	return Counter(targets).most_common(1)[0][0]
+    # Return most common target
+    return Counter(targets).most_common(1)[0][0]
 
 
 def kNearestNeighbor(X_train, y_train, X_test, predictions, k):
-	# Loop over all observations
-	for i in range(len(X_test)):
-		predictions.append(predict(X_train, y_train, X_test[i, :], k))
+    # Loop over all observations
+    for i in range(len(X_test)):
+        predictions.append(predict(X_train, y_train, X_test[i, :], k))
 
 def confusion_matrix(y_real, y_predicted):
-	matrix = np.zeros([len(set(y_real)), len(set(y_real))])
-	for i in range(len(set(y_real))):
-		for j in range(len(set(y_real))):
-			matrix[i, j] = len(
-				filter(
-					lambda x : x[0] == i+1 and x[1] == j+1, 
-					zip(y_real, y_predicted)
-					)
-				)
-	return matrix
+    matrix = np.zeros([len(set(y_real)), len(set(y_real))])
+    for i in range(len(set(y_real))):
+        for j in range(len(set(y_real))):
+            matrix[i, j] = len(
+                filter(
+                    lambda x : x[0] == i+1 and x[1] == j+1,
+                    zip(y_real, y_predicted)
+                    )
+                )
+    return matrix
 
 if __name__ == "__main__":
 	# Creating Dataset
@@ -330,4 +331,5 @@ if __name__ == "__main__":
 			#print "Number of 2 : {}".format(sum(sum(net.cells[:, :, -1] == 2)))
 			#print "Number of 3 : {}".format(sum(sum(net.cells[:, :, -1] == 3)))
 		print "Accuracy iteration {} : {}".format(i, accuracy / 4)
-		
+
+
