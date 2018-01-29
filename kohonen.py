@@ -3,6 +3,10 @@ import csv
 import matplotlib.pyplot as plt
 import time
 from collections import Counter
+import sys
+
+# Testing
+from sklearn.metrics import accuracy_score
 
 #==============================================================================
 # Useful Constants
@@ -34,7 +38,7 @@ class SOM(object):
 
 		self.data = dataset
 		self.radius = max(width, height) / 2.0
-		self.learning_rate = 0.13
+		self.learning_rate = 0.1
 		self.som_size = width, height
 		self.cell_size = len(dataset[0])
 		self.cells = np.random.random((width, height, self.cell_size))
@@ -61,7 +65,7 @@ class SOM(object):
 		Return:
 			learning rate at the i-th iterations
 		"""
-		return self.learning_rate * np.exp(-i / time)
+		return self.learning_rate * np.exp(- i / time)
 
 	def calculate_gaussian_influence(self, distance, radius):
 		"""
@@ -165,10 +169,35 @@ class SOM(object):
 		type1 = ax.scatter(x1, y1, s=50, c='red')
 		type2 = ax.scatter(x2, y2, s=50, c='green')
 		type3 = ax.scatter(x3, y3, s=50, c='blue')
-		ax.set_title('Taille du petal : jeu de donnees Iris', fontsize=14)
-		ax.set_xlabel('Longueur petal  normalisee (cm)')
-		ax.set_ylabel('Largeur petal normalisee (cm)')
-		ax.legend([type1, type2, type3], ["P-Iris Setosa", "P-Iris Versicolor", "P-Iris Virginica"], loc=2)
+
+		# Displaying Dataset
+		x1, y1 = [], []
+		x2, y2 = [], []
+		x3, y3 = [], []
+		p = 2 # petal length
+		q = 3 # petal width 
+		for i, elem in enumerate(net.data):
+			if net.data[i, -1] == 1:
+				x1.append(net.data[i][p])
+				y1.append(net.data[i][q])
+			elif net.data[i, -1] == 2:
+				x2.append(net.data[i][p])
+				y2.append(net.data[i][q])
+			elif net.data[i, -1] == 3:
+				x3.append(net.data[i][p])
+				y3.append(net.data[i][q])
+		type11 = ax.scatter(x1, y1, s=25, c='red', marker="+")
+		type21 = ax.scatter(x2, y2, s=25, c='green', marker="+")
+		type31 = ax.scatter(x3, y3, s=25, c='blue', marker="+")
+
+		ax.set_title('Base Iris', fontsize=14)
+		ax.set_xlabel('Longueur petal (cm)')
+		ax.set_ylabel('Largeur petal (cm)')
+		ax.legend([type1, type2, type3, type11, type21, type31 ], 
+			["Prototype Setosa", "Prototype Versicolor", "Prototype Virginica",
+			"Iris Setosa", "Iris Versicolor", "Iris Virginica" ], 
+			#loc=1, 
+			bbox_to_anchor=(1.0, 1.0))
 		return ax
 
 	def assignNeighbor(self, k):
@@ -244,52 +273,61 @@ if __name__ == "__main__":
 	plt.ion()
 	ax = fig.add_subplot(111)
 
-	accuracy = 0
+	accuracy 	= 0
+	bloc_size 	= 30
 	np.random.shuffle(X)
 
 	# Cross-Validation
 	for i in range(5):
-		# Split datas
-		x_test = X[i*30:(i+1)*30]
-		indexes = range(i*30, (i+1)*30) 
-		x_train = np.delete(X, indexes, 0)
+		accuracy 	= 0
+		x_test 		= X[bloc_size * i : bloc_size * (i+1)]
+		indexes 	= range(i * bloc_size, (i+1) * bloc_size) 
 
-		# Clear previous learning
-		net.data = x_train
-		net.clear()
+		x_remain 	= np.delete(X, indexes, 0)
 
-		# Start Learning
-		for i in range(num_iterations):
-			net.train_one_time(i)
-			if (i % dt == 0) or (i == 80):
-				ax.clear()
-				ax = net.draw(ax)
-				net.assignNeighbor(5)
-				plt.plot()
-				plt.draw()
-				plt.pause(0.01)
-				#fig.canvas.draw()
-				#fig.savefig("kohonen_{}".format(i))
+		for j in range(4):
+			# Split datas
+			x_valid = x_remain[j * bloc_size:(j+1) * bloc_size]
+			indexes = range(j * bloc_size, (j+1) * bloc_size) 
+			x_train = np.delete(x_remain, indexes, 0)
 
-		# KNN assignement
-		#net.assignNeighbor(5)
+			# Clear previous learning
+			net.data = x_train
+			net.clear()
 
-		# Accuracy calculus
-		y_test = x_test[:, -1]
-		y_predicted = []
-		for x in x_test:
-			_, bmu_idx = net.find_bmu(x)
-			y_predicted.append(net.cells[bmu_idx[0], bmu_idx[1], -1])
-		matrix = confusion_matrix(y_test, y_predicted)
-		print matrix
-		accuracy += sum([matrix[i, i] for i in range(len(matrix))]) / matrix.sum()
+			# Start Learning
+			for t in range(num_iterations):
+				net.train_one_time(t)
+				cond = (t == 0) or (t == 75) or (t == 300) or (t == num_iterations-1)
+				if cond:
+					net.assignNeighbor(5)
+					ax.clear()
+					ax = net.draw(ax)
+					plt.plot()
+					plt.draw()
+					plt.pause(10.0)
+					#fig.canvas.draw()
+					fig.savefig("kohonen_{}".format(t))
 
-	print accuracy / 5
+			# KNN assignement
+			net.assignNeighbor(5)
 
-	
+			# Accuracy calculus
+			y_valid = x_valid[:, -1]
+			y_predicted = []
+			for x in x_valid:
+				_, bmu_idx = net.find_bmu(x)
+				y_predicted.append(net.cells[bmu_idx[0], bmu_idx[1], -1])
 
+			# Testing
+			#print y_valid, y_predicted
+			accuracy += accuracy_score(y_valid, y_predicted)
 
-
-
-
+			#matrix = confusion_matrix(y_valid, y_predicted)
+			#print matrix
+			#accuracy += sum([matrix[n, n] for n in range(len(matrix))]) / matrix.sum()
+			#print "Number of 1 : {}".format(sum(sum(net.cells[:, :, -1] == 1)))
+			#print "Number of 2 : {}".format(sum(sum(net.cells[:, :, -1] == 2)))
+			#print "Number of 3 : {}".format(sum(sum(net.cells[:, :, -1] == 3)))
+		print "Accuracy iteration {} : {}".format(i, accuracy / 4)
 		
