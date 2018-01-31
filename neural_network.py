@@ -2,27 +2,8 @@ import random as random
 import math as math
 import numpy as np 
 import csv as csv
-import json
-
-# For style
-import pprint
 
 NCN = float('Inf')
-
-# Load network.json
-def load_network():
-	with open('./network.json', 'rb'):
-		network = json.load(open('./network.json', 'rb'))['network']
-		for k, layer in enumerate(network):
-			for i, neuron in enumerate(layer):
-				for key in neuron['weights'].keys():
-					if key == 'bias': continue
-					for j in range(len(neuron['weights'][key])):
-						if neuron['weights'][key][j] == "NCN":
-							neuron['weights'][key][j] = NCN
-				if neuron['function'] == "None":
-					neuron['function'] = None
-	return network
 
 # Load file
 def load_file():
@@ -139,49 +120,27 @@ def backward_propagate(network, expected):
 				neuron['epsilon'] = errors[i] * derivated_transfer(neuron['output'], neuron['function'])
 
 # Update weights
-def update_weights(network, inputs, alpha, momentum, shared):
-
-	# For each layer
+def update_weights(network, inputs, alpha, momentum = 0.99):
+	# Alpha is the learning rate
+	# Inputs
 	for k, layer in enumerate(network):
-		# For each neuron in k-th layer
 		for i, neuron in enumerate(layer):
-			# For each i-th layer connected with the neuron
 			for key in neuron['weights']:
-				#if neuron['shared']:
-					# Do something
-				#	pass 
-				# If bias
 				if key == 'bias':
 					neuron['weights'][key] += alpha * neuron['epsilon']
-				# Else weight
 				else:
-					# For each neuron in i-th layer potential connected with k-th layer
 					for j in range(len(neuron['weights'][key])):
 						if neuron['weights'][key][j] == NCN: continue
 						if int(key) == 0:
 							mu = (1.0 - momentum) * neuron['weights'][key][j] + momentum * inputs[j] * neuron['epsilon']
 							neuron['weights'][key][j] += alpha * mu
 						else:
-							
-							sum_share = 0.0
-							# If the neuron is shared : Shared weights
-							for share in shared:
-								if (k, i, int(key), j) in share: 
-									for couple in share:
-										sum_share += network[k][i]['output'] * neuron['epsilon']
-								if (int(key), j, k, i) in share:
-									for couple in share:
-										sum_share += network[k][i]['output'] * neuron['epsilon']
-							#mu = (1.0 - momentum) * neuron['weights'][key][j] + momentum * network[int(key)-1][j]['output'] * neuron['epsilon']
-							mu = (1.0 - momentum) * neuron['weights'][key][j] + momentum * sum_share
+							mu = (1.0 - momentum) * neuron['weights'][key][j] + momentum * network[int(key)-1][j]['output'] * neuron['epsilon']
 							neuron['weights'][key][j] += alpha * mu
 
 # Cross entropy error function
-def cross_entropy(excepted, predict):
-	try:
-		return - excepted * math.log((excepted / predict) + 10e-8, 2)
-	except ValueError:
-		print excepted, predict 
+def cross_entropy(expect, predict):
+	return - expect * math.log((expect / predict) + 10e-8, 2)
 
 # MSE
 def mean_squared(x, y):
@@ -189,26 +148,24 @@ def mean_squared(x, y):
 
 # Decrease learning rate
 def decay_learning_rate(alpha, tau, t):
-	return alpha * tau / (tau + t) if tau > 0 else alpha
+	return alpha * tau / (tau + t)
 
 # Train the network
-def train_network(network, trainset, shared, alpha, momentum, tau, num_iter, n_outputs):
+def train_network(network, trainset, alpha, momentum, tau, num_iter, n_outputs):
 	for epoch in range(num_iter):
 		sum_error = 0
 		current_alpha = decay_learning_rate(alpha, tau, epoch)
-		#np.random.shuffle(trainset)
 		for inputs in trainset:
-			outputs = softmax(forward_propagate(network, [inputs[:-1]])[-1])
+			outputs = forward_propagate(network, [inputs[:-1]])[-1]
 			expected = [0.0 for i in range(n_outputs)]
 			expected[int(inputs[-1])-1] = 1.0
 			#expected = [inputs[-1]]
 			#sum_error += mean_squared(expected[-1], outputs[-1])
 			sum_error += sum([cross_entropy(expected[i], outputs[i]) for i in range(n_outputs)])
 			backward_propagate(network, expected)
-			update_weights(network, inputs, current_alpha, momentum, shared)
+			update_weights(network, inputs, current_alpha, momentum)
 		print "Epoch : {}; lrate = {:.3}; error={:.5}".format(epoch, current_alpha, sum_error)
 
-# Compute softmax
 def softmax(inputs):
 	exp_in = map(math.exp, inputs)
 	return [item / sum(exp_in) for item in exp_in]
@@ -219,69 +176,172 @@ def predict(network, inputs):
 	return outputs[-1]
 	#return outputs.index(max(outputs))
 
-# Randomly uniform initialization
-def initialize(network, shared):
-	for layer in network:
-		for neuron in layer:
-			for connection in neuron['weights'].keys():
-				if connection == 'bias':
-					neuron[connection] = random.gauss(0, 1.0 / math.sqrt(len(layer)))
-				else:
-					for i in range(len(neuron['weights'][connection])):
-						if neuron['weights'][connection][i] == NCN: continue
-						neuron['weights'][connection][i] = random.gauss(0, 1.0 / math.sqrt(len(layer)))
-	for share in shared:
-		for t in share:
-			network[t[0]][t[1]]['weights'][str(t[2])][t[3]] = network[share[0][0]][share[0][1]]['weights'][str(share[0][2])][share[0][3]]
+network = \
+[
+	#C1 - 1
+	[{	'weights' : 
+		{
+			'0' : [0.5, 0.5, NCN, NCN],
+			'bias' : 0.5
+		},
+		'function' : 'ReLU'
+	},
+	{	'weights' : 
+		{
+			'0' : [NCN, NCN, 0.5, 0.5],
+			'bias' : 0.5
+		},
+		'function' : 'ReLU'
+	},
+	{	'weights' : 
+		{
+			'0' : [0.5, 0.5, NCN, NCN],
+			'bias' : 0.5
+		},
+		'function' : 'ReLU'
+	},
+	{	'weights' : 
+		{
+			'0' : [NCN, NCN, 0.5, 0.5],
+			'bias' : 0.5
+		},
+		'function' : 'ReLU'
+	},
+	{	'weights' : 
+		{
+			'0' : [0.5, 0.5, NCN, NCN],
+			'bias' : 0.5
+		},
+		'function' : 'ReLU'
+	},
+	{	'weights' : 
+		{
+			'0' : [NCN, NCN, 0.5, 0.5],
+			'bias' : 0.5
+		},
+		'function' : 'ReLU'
+	}],
+
+	#C2 - 2
+	[{	'weights' : 
+		{
+			'1' : [0.5, NCN, 0.5, NCN, 0.5, NCN],
+			'bias' : 0.5
+		},
+		'function' : 'ReLU'
+	},
+	{	'weights' : 
+		{
+			'1' : [NCN, 0.5, NCN, 0.5, NCN, 0.5],
+			'bias' : 0.5
+		},
+		'function' : 'ReLU'
+	},
+	{	'weights' : 
+		{
+			'1' : [0.5, NCN, 0.5, NCN, 0.5, NCN],
+			'bias' : 0.5
+		},
+		'function' : 'ReLU'
+	},
+	{	'weights' : 
+		{
+			'1' : [NCN, 0.5, NCN, 0.5, NCN, 0.5],
+			'bias' : 0.5
+		},
+		'function' : 'ReLU'
+	}],
+
+	#H1 - 3
+	[{	'weights' : 
+		{
+			'0' : [0.5, 0.5, 0.5, 0.5],
+			'2' : [0.5, 0.5, 0.5, 0.5],
+			'bias' : 0.5
+		},
+		'function' : 'ReLU'
+	},
+	{	'weights' : 
+		{
+			'0' : [0.5, 0.5, 0.5, 0.5],
+			'2' : [0.5, 0.5, 0.5, 0.5],
+			'bias' : 0.5
+		},
+		'function' : 'ReLU'
+	}],
+
+	#H2 - 4
+	[{	'weights' : 
+		{
+			'0' : [0.5, 0.5, 0.5, 0.5],
+			'3' : [0.5, 0.5],
+			'bias' : 0.5
+		},
+		'function' : 'ReLU'
+	},
+	{	'weights' : 
+		{
+			'0' : [0.5, 0.5, 0.5, 0.5],
+			'3' : [0.5, 0.5],
+			'bias' : 0.5
+		},
+		'function' : 'ReLU'
+	}],
+
+	# H3 - 5
+	[{	'weights' : 
+		{
+			'0' : [0.5, 0.5, 0.5, 0.5],
+			'4' : [0.5, 0.5],
+			'bias' : 0.5
+		},
+		'function' : 'Tanh'
+	},
+	{	'weights' : 
+		{
+			'0' : [0.5, 0.5, 0.5, 0.5],
+			'4' : [0.5, 0.5],
+			'bias' : 0.5
+		},
+		'function' : 'Tanh'
+	}],
+
+	# Last layer : S
+	[{	'weights' : 
+		{
+			'5' : [0.5, 0.5],
+			'bias' : 0.5
+		},
+		'function' : None
+	},
+	{	'weights' : 
+		{
+			'5' : [0.5, 0.5],
+			'bias' : 0.5
+		},
+		'function' : None
+	},
+	{	'weights' : 
+		{
+			'5' : [0.5, 0.5],
+			'bias' : 0.5
+		},
+		'function' : None
+	}]
+]
 
 random.seed(1)
 dataset = load_file()
 np.random.shuffle(dataset)
-
-shared = [
-	# Convonlutional C1
-	[(0, 0, 0, 0), (0, 1, 0, 1), (0, 2, 0, 2)],
-	[(0, 3, 0, 0), (0, 4, 0, 1), (0, 5, 0, 2)],
-	[(0, 0, 0, 1), (0, 1, 0, 2), (0, 2, 0, 3)],
-	[(0, 3, 0, 1), (0, 4, 0, 2), (0, 5, 0, 3)],
-
-	# Conconlutional C2
-	[(1, 0, 1, 0), (1, 1, 1, 1)],
-	[(1, 0, 1, 1), (1, 1, 1, 2)],
-	[(1, 0, 1, 3), (1, 1, 1, 4)],
-	[(1, 0, 1, 4), (1, 1, 1, 5)],
-	[(1, 2, 1, 0), (1, 3, 1, 1)],
-	[(1, 2, 1, 1), (1, 3, 1, 2)],
-	[(1, 2, 1, 3), (1, 3, 1, 4)],
-	[(1, 2, 1, 4), (1, 3, 1, 5)],
-
-	# Shared additional
-	[(2, 0, 0, 0), (3, 0, 0, 0), (4, 0, 0, 0)],
-	[(2, 0, 0, 1), (3, 0, 0, 1), (4, 0, 0, 1)],
-	[(2, 0, 0, 2), (3, 0, 0, 2), (4, 0, 0, 2)],
-	[(2, 0, 0, 3), (3, 0, 0, 3), (4, 0, 0, 3)],
-
-	[(2, 1, 0, 0), (3, 1, 0, 0), (4, 1, 0, 0)],
-	[(2, 1, 0, 1), (3, 1, 0, 1), (4, 1, 0, 1)],
-	[(2, 1, 0, 2), (3, 1, 0, 2), (4, 1, 0, 2)],
-	[(2, 1, 0, 3), (3, 1, 0, 3), (4, 1, 0, 3)],
-]
-
-network = load_network()
-
-np.random.shuffle(dataset)
-learning_rate = 0.05
-tau = 50
-momentum = 1.0
+learning_rate = 0.2
+tau = 200
+momentum = 0.99
 n_outputs = 3
 epochs = 100
 
-pp = pprint.PrettyPrinter()
-initialize(network, shared)
-
-train_network(network, dataset, shared, learning_rate, momentum, tau, epochs, n_outputs)
-#for layer in network:
-#	print(layer)
-print predict(network, [[1, 0, 0, 0, None]])
-print predict(network, [[0, 1, 1, 0, None]])
-print predict(network, [[1, 0, 0, 1, None]])
+train_network(network, dataset, learning_rate, momentum, tau, epochs, n_outputs)
+for layer in network:
+	print(layer)
+print softmax(predict(network, [[0.22222215, 0.625, 0.0677966, 0.04166666, None]]))
+print softmax(predict(network, [[0.74999994, 0.5, 0.6271186, 0.5416666, None]]))
+print softmax(predict(network, [[0.44444442, 0.41666666, 0.69491524, 0.70833325, None]]))
