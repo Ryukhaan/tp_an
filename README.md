@@ -24,7 +24,7 @@ Le dossier `drafts` contient quelques ébauches de construction d'un perceptron 
 
 ### Résultats
 
-Contient quelques images et vidéo qui montrent les résultats des algorithmes.
+Contient quelques fichiers image et vidéo qui montrent les résultats des algorithmes.
 
 ## Prérequis
 
