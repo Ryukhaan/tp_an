@@ -19,7 +19,7 @@ Contient les fichiers GinNet et python relatif à la partie sur le traitement de
 ### Parole
 
 Sous format GINNet, le meilleur réseau en perceptron multi-couche qui a pu être généré se trouve dans le dossier Parole (`network_parole_GINNet.net`).
-Le dossier `drafts` contient quelques ébauches de construction d'un perceptron multi-couche.
+Le dossier `drafts` contient quelques ébauches de construction d'un perceptron multi-couches.
 
 
 ### Résultats
