@@ -10,7 +10,7 @@ Ce dépôt Git contient le code relatif au Mini-Projet du cours d'Apprentissage 
 
 Contient les fichiers GinNet et python relatif à la partie sur le traitement de signal de sonar.
 
-* *GINNET NN* - Contient le meilleur réseau obtenu dans l'étude pour le traitement.
+* **GINNET NN** - Contient le meilleur réseau obtenu dans l'étude pour le traitement.
 * *KNNSonar.py* - implémentation de la méthode KNN sur les signaux.
 * *sonar.data* - le fichier de base qui contient les données.
 * *sonar_data.txt* - le fichier de sortie obtenu grâce au *Data convert.py*
